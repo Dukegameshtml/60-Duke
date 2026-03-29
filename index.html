@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>60 DUKE: Ultimate Motion & Insanity</title>
+    <style>
+        :root {
+            --primary: #6366f1; --danger: #ef4444; --warning: #f59e0b;
+            --mutant-color: #84cc16; --glass: rgba(255, 255, 255, 0.1);
+            --bg: #0f172a; --panel: #1e293b; --text: #f8fafc;
+        }
+
+        .mobile-mode { --bg: #020617; }
+        * { box-sizing: border-box; transition: all 0.3s ease; touch-action: none; }
+        body, html { margin: 0; padding: 0; height: 100%; font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); overflow: hidden; }
+
+        .screen { display: none; width: 100vw; height: 100vh; position: relative; flex-direction: column; overflow: hidden; }
+        .active { display: flex; }
+
+        /* DEVICE TOGGLE */
+        .device-toggle {
+            position: fixed; top: 15px; right: 15px; z-index: 9999;
+            background: var(--primary); border: none; border-radius: 50%;
+            width: 55px; height: 55px; cursor: pointer; font-size: 24px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center;
+        }
+
+        /* LAYOUTS */
+        #survival-ui { display: grid; grid-template-columns: 1fr 380px; gap: 20px; padding: 20px; height: 100vh; }
+        .mobile-mode #survival-ui { display: flex; flex-direction: column; padding: 10px; overflow-y: auto; }
+
+        .main-view {
+            background: var(--panel); border-radius: 30px; position: relative;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+        }
+
+        /* STATS & AVATARS */
+        .stats-grid { position: absolute; top: 20px; left: 20px; right: 20px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+        .stat-card { background: var(--glass); padding: 12px; border-radius: 15px; text-align: center; backdrop-filter: blur(5px); }
+        .stat-val { font-size: 22px; font-weight: 900; display: block; }
+        .stat-label { font-size: 9px; opacity: 0.6; text-transform: uppercase; }
+
+        .avatar { font-size: clamp(70px, 20vw, 120px); margin: 30px 0; transition: transform 0.1s; }
+        
+        /* BARS */
+        .bars { width: 85%; max-width: 350px; }
+        .bar-wrap { height: 12px; background: rgba(0,0,0,0.3); border-radius: 10px; margin: 5px 0 15px; overflow: hidden; }
+        .bar-fill { height: 100%; width: 0%; transition: width 0.4s; }
+
+        /* SIDEBAR / LOGS */
+        .sidebar { background: var(--panel); border-radius: 30px; padding: 20px; display: flex; flex-direction: column; }
+        #log-text { flex-grow: 1; overflow-y: auto; margin-bottom: 15px; display: flex; flex-direction: column; gap: 8px; max-height: 250px; }
+        .log-item { background: var(--glass); padding: 12px; border-radius: 12px; font-size: 13px; border-left: 4px solid var(--primary); }
+
+        /* BUTTONS */
+        .btn { padding: 16px; border: none; border-radius: 18px; font-weight: 800; cursor: pointer; text-transform: uppercase; width: 100%; font-size: 15px; font-family: inherit; }
+        .btn-main { background: var(--primary); color: white; margin-bottom: 10px; }
+        .btn-sec { background: var(--danger); color: white; }
+
+        /* MOBILE SCAVENGE CONTROLS */
+        #gyro-info { position: absolute; top: 60px; width: 100%; text-align: center; font-size: 12px; color: var(--warning); display: none; }
+        .mobile-mode #gyro-info { display: block; }
+        
+        #joy-pad {
+            display: none; position: absolute; bottom: 40px; width: 100%;
+            justify-content: center; gap: 15px;
+        }
+        .mobile-mode #joy-pad { display: flex; }
+        .joy-btn { width: 65px; height: 65px; background: var(--glass); border: 2px solid white; border-radius: 50%; color: white; font-size: 24px; display: flex; align-items: center; justify-content: center; }
+
+        /* MODAL */
+        .modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 10000; align-items: center; justify-content: center; backdrop-filter: blur(8px); }
+        .modal-box { background: var(--panel); padding: 35px; border-radius: 35px; width: 90%; max-width: 400px; text-align: center; border: 1px solid rgba(255,255,255,0.1); color: white; }
+    </style>
+</head>
+<body>
+
+    <button class="device-toggle" onclick="toggleDevice()">📱</button>
+
+    <div id="main-menu" class="screen active" style="justify-content:center; align-items:center;">
+        <h1 style="font-size: 70px; margin: 0; background: linear-gradient(45deg, #ef4444, #f59e0b); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">60 DUKE</h1>
+        <p style="letter-spacing: 4px; opacity: 0.7; font-weight: bold;">ULTIMATE MOTION EDITION</p>
+        <button class="btn btn-main" style="max-width: 280px; margin-top: 30px;" onclick="requestGyroAndAudio()">ROZPOCZNIJ GRĘ</button>
+    </div>
+
+    <div id="scavenge-ui" class="screen" style="justify-content:center; align-items:center; background: #020617;">
+        <div id="gyro-info">PRZECHYLAJ TELEFON, BY STEROWAĆ</div>
+        <div style="background: var(--danger); padding: 8px 25px; border-radius: 25px; margin-bottom: 15px; font-weight: 900; font-size: 20px;">
+            <span id="timer">30</span>s
+        </div>
+        <canvas id="game-canvas"></canvas>
+        <div id="joy-pad">
+            <button class="joy-btn" ontouchstart="keys['a']=true" ontouchend="keys['a']=false">←</button>
+            <button class="joy-btn" ontouchstart="keys['w']=true" ontouchend="keys['w']=false">↑</button>
+            <button class="joy-btn" ontouchstart="keys['s']=true" ontouchend="keys['s']=false">↓</button>
+            <button class="joy-btn" ontouchstart="keys['d']=true" ontouchend="keys['d']=false">→</button>
+        </div>
+    </div>
+
+    <div id="survival-ui" class="screen">
+        <div class="main-view">
+            <div class="stats-grid">
+                <div class="stat-card"><span class="stat-val" id="r-food">0</span><span class="stat-label">Jedzenie</span></div>
+                <div class="stat-card"><span class="stat-val" id="r-water">0</span><span class="stat-label">Woda</span></div>
+                <div class="stat-card"><span class="stat-val" id="r-day">1</span><span class="stat-label">Dzień</span></div>
+            </div>
+
+            <div id="char-Duke" class="avatar">👨‍💼</div>
+            <div id="char-Mary" class="avatar" style="font-size: 50px; margin-top: -20px;">👧</div>
+
+            <div class="bars">
+                <div class="stat-label">Mutacja Spremusa</div>
+                <div class="bar-wrap"><div id="m-fill" class="bar-fill" style="background: var(--mutant-color);"></div></div>
+                <div class="stat-label">Napięcie</div>
+                <div class="bar-wrap"><div id="t-fill" class="bar-fill" style="background: var(--warning);"></div></div>
+            </div>
+
+            <button class="btn btn-main" style="width: 85%; margin-top: 20px;" onclick="openPersuasion()">Namawiaj Mary</button>
+        </div>
+
+        <div class="sidebar">
+            <div id="log-text"></div>
+            <button class="btn btn-sec" onclick="nextDay()">Następny Dzień</button>
+        </div>
+    </div>
+
+    <div id="modal-bg" class="modal-bg">
+        <div class="modal-box">
+            <h2 id="m-title" style="color:var(--warning)"></h2>
+            <p id="m-desc" style="font-size: 14px; opacity: 0.8;"></p>
+            <div id="m-actions" style="display:flex; flex-direction:column; gap:12px;"></div>
+            <button class="btn" style="margin-top:10px; background: #334155; color: white;" onclick="closeModal()">Wróć</button>
+        </div>
+    </div>
+
+<script>
+    // --- STATE ---
+    let state = {
+        day: 1, food: 0, water: 0, mutation: 0, tension: 10, maryRel: 40,
+        timeLeft: 30, isMobile: false, gyro: { x: 0, y: 0 }
+    };
+
+    const canvas = document.getElementById('game-canvas');
+    const ctx = canvas.getContext('2d');
+    let player = { x: 200, y: 200 };
+    let items = [];
+    let keys = {};
+
+    // --- AUDIO ENGINE ---
+    let audioCtx;
+    function initAudio() { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+
+    function playSynth(type) {
+        if(!audioCtx) return;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        if (type === 'scream') {
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.5);
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+        } else if (type === 'mutation') {
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(60, audioCtx.currentTime);
+            osc.frequency.linearRampToValueAtTime(40, audioCtx.currentTime + 1);
+            gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1);
+        } else if (type === 'success') {
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+            osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.2);
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
+        } else if (type === 'error') {
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+            osc.frequency.linearRampToValueAtTime(100, audioCtx.currentTime + 0.3);
+            gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+        }
+        osc.start(); osc.stop(audioCtx.currentTime + 1);
+    }
+
+    // --- GYRO SETUP ---
+    function requestGyroAndAudio() {
+        initAudio(); // Initialize audio on first click
+        if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+            DeviceOrientationEvent.requestPermission()
+                .then(response => { if (response == 'granted') window.addEventListener('deviceorientation', handleOrientation); })
+                .catch(console.error);
+        } else {
+            window.addEventListener('deviceorientation', handleOrientation);
+        }
+        startScavenge();
+    }
+
+    function handleOrientation(e) {
+        state.gyro.x = e.gamma / 10; // Lewo/Prawo
+        state.gyro.y = (e.beta - 45) / 10;  // Przód/Tył (zakłada kąt 45st)
+    }
+
+    function toggleDevice() {
+        state.isMobile = !state.isMobile;
+        document.body.classList.toggle('mobile-mode');
+        document.querySelector('.device-toggle').innerText = state.isMobile ? "💻" : "📱";
+        resizeCanvas();
+    }
+
+    function resizeCanvas() {
+        canvas.width = state.isMobile ? window.innerWidth - 40 : 800;
+        canvas.height = state.isMobile ? 350 : 500;
+        player = { x: canvas.width/2, y: canvas.height/2 };
+    }
+
+    function startScavenge() {
+        document.getElementById('main-menu').classList.remove('active');
+        document.getElementById('scavenge-ui').classList.add('active');
+        resizeCanvas();
+        for(let i=0; i<15; i++) items.push({x: Math.random()*(canvas.width-40)+20, y: Math.random()*(canvas.height-40)+20, type: Math.random()>0.5?'food':'water'});
+        
+        const loop = setInterval(() => {
+            if(state.timeLeft <= 0) { clearInterval(loop); startSurvival(); return; }
+            let dx = 0, dy = 0;
+            if(keys['w']) dy -= 5; if(keys['s']) dy += 5;
+            if(keys['a']) dx -= 5; if(keys['d']) dx += 5;
+            if(state.isMobile) { dx += state.gyro.x * 2.5; dy += state.gyro.y * 2.5; }
+            player.x = Math.max(10, Math.min(canvas.width-10, player.x + dx));
+            player.y = Math.max(10, Math.min(canvas.height-10, player.y + dy));
+
+            items = items.filter(it => {
+                if(Math.hypot(player.x - it.x, player.y - it.y) < 25) {
+                    if(it.type === 'food') state.food++; else state.water++;
+                    return false;
+                } return true;
+            });
+
+            ctx.fillStyle = '#020617'; ctx.fillRect(0,0,canvas.width,canvas.height);
+            items.forEach(it => {
+                ctx.fillStyle = it.type === 'food' ? '#f59e0b' : '#3b82f6';
+                ctx.beginPath(); ctx.arc(it.x, it.y, 12, 0, 7); ctx.fill();
+            });
+            ctx.fillStyle = 'white'; ctx.shadowBlur = 15; ctx.shadowColor = "white";
+            ctx.fillRect(player.x-12, player.y-12, 24, 24); ctx.shadowBlur = 0;
+        }, 1000/60);
+
+        const timerInt = setInterval(() => { 
+            if(state.timeLeft > 0) { state.timeLeft--; document.getElementById('timer').innerText = state.timeLeft; }
+            else clearInterval(timerInt);
+        }, 1000);
+    }
+
+    function startSurvival() {
+        document.getElementById('scavenge-ui').classList.remove('active');
+        document.getElementById('survival-ui').classList.add('active');
+        addToLog("Bunkier zamknięty. Czas zacząć czekanie.");
+        updateUI();
+    }
+
+    function openPersuasion() {
+        if(state.tension < 30) { addToLog("Duke nie czuje potrzeby."); return; }
+        showModal("Namawianie Mary", "Duke potrzebuje 'rozładować napięcie', inaczej mutacja Spremusa go rozerwie.", [
+            {text: "Mów czule", type: "soft"},
+            {text: "Przekup puszką jedzenia", type: "bribe"}
+        ]);
+    }
+
+    function showModal(title, desc, actions) {
+        document.getElementById('m-title').innerText = title;
+        document.getElementById('m-desc').innerText = desc;
+        const container = document.getElementById('m-actions'); container.innerHTML = "";
+        actions.forEach(a => {
+            const b = document.createElement('button');
+            b.className = "btn btn-main"; b.innerText = a.text;
+            b.onclick = () => {
+                closeModal();
+                let chance = state.maryRel;
+                if(a.type === 'bribe' && state.food > 0) { state.food--; chance += 40; }
+                if(Math.random()*100 < chance) {
+                    state.tension = 0; state.mutation -= 20; state.maryRel += 5; playSynth('success');
+                    addToLog("Sukces: Mary uległa. Napięcie opadło, Duke czuje ulgę.");
+                } else {
+                    state.maryRel -= 25; state.tension += 15; playSynth('scream'); playSynth('error');
+                    addToLog("Odmowa: Mary krzyczy: 'Jesteś moim ojcem, nie dam ci się wyruchać!'");
+                }
+                updateUI();
+            };
+            container.appendChild(b);
+        });
+        document.getElementById('modal-bg').style.display = 'flex';
+    }
+
+    function nextDay() {
+        state.day++; state.mutation += 12; state.tension += 18; playSynth('mutation');
+        if(state.food > 0) state.food--; else state.maryRel -= 15;
+        if(state.mutation >= 100) { alert("STAŁEŚ SIĘ SPREMUSEM."); location.reload(); }
+        addToLog(`Dzień ${state.day}: Mutacja swędzi coraz mocniej...`);
+        updateUI();
+    }
+
+    function updateUI() {
+        document.getElementById('r-food').innerText = state.food;
+        document.getElementById('r-water').innerText = state.water;
+        document.getElementById('r-day').innerText = state.day;
+        document.getElementById('m-fill').style.width = state.mutation + "%";
+        document.getElementById('t-fill').style.width = state.tension + "%";
+        // Shake visual effect
+        document.getElementById('char-Duke').style.transform = `scale(${1 + state.mutation/200}) rotate(${state.mutation/5}deg)`;
+    }
+
+    function addToLog(m) {
+        const div = document.createElement('div'); div.className = "log-item"; div.innerText = m;
+        document.getElementById('log-text').prepend(div);
+    }
+
+    function closeModal() { document.getElementById('modal-bg').style.display = 'none'; }
+    window.onkeydown = e => keys[e.key.toLowerCase()] = true;
+    window.onkeyup = e => keys[e.key.toLowerCase()] = false;
+</script>
+</body>
+</html>
